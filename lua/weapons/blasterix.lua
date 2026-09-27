@@ -37,6 +37,11 @@ SWEP.ViewModel = "models/weapons/c_irifle.mdl"
 SWEP.WorldModel = "models/weapons/w_irifle.mdl"
 SWEP.UseHands = true
 
+-- Базовый CanPrimaryAttack молча блокирует выстрел при Ammo = "none" и ClipSize = -1
+function SWEP:CanPrimaryAttack()
+    return true
+end
+
 function SWEP:Initialize()
     self:SetHoldType("ar2")
 end
