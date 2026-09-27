@@ -119,6 +119,12 @@ if CLIENT then
         local frac = 1 - math.Clamp((self:GetNextPrimaryFire() - CurTime()) / CHARGE_TIME, 0, 1)
         local charging = frac < 1
 
+        -- GetTextSize возвращает nil, если шрифт ещё не отрисован ни разу —
+        -- сначала рисуем текст вхолостую, потом меряем
+        surface.SetFont("TargetBB")
+        surface.SetTextColor(0, 0, 0, 0)
+        surface.SetTextPos(-100, -100)
+        surface.DrawText("ЗАРЯДКА")
         surface.SetFont("TargetBB")
         local w = 200
         local h = 14
@@ -142,6 +148,8 @@ if CLIENT then
         local label = charging and ("ЗАРЯДКА: " .. math.ceil(self:GetNextPrimaryFire() - CurTime()) .. "с")
             or "ГОТОВ К ВЫСТРЕЛУ"
         local tw, th = surface.GetTextSize(label)
+        tw = tw or 0
+        th = th or 0
         surface.SetTextPos(x + (w - tw) / 2, y + h + 6)
         surface.DrawText(label)
     end
