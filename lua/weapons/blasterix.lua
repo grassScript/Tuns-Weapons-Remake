@@ -111,6 +111,14 @@ end
 if CLIENT then
     local CHARGE_TIME = 5
 
+    -- Кастомный шрифт: TargetBB в GMod не существует, а для GetTextSize
+    -- нужен валидный шрифт. DejaVu Sans на месте и в Windows, и в Linux.
+    surface.CreateFont("BlasterixHUD", {
+        font = "DejaVu Sans",
+        size = 18,
+        weight = 600,
+    })
+
     -- HUD-полоса: сколько осталось до следующего выстрела
     function SWEP:DrawHUD()
         local owner = self:GetOwner()
@@ -119,13 +127,6 @@ if CLIENT then
         local frac = 1 - math.Clamp((self:GetNextPrimaryFire() - CurTime()) / CHARGE_TIME, 0, 1)
         local charging = frac < 1
 
-        -- GetTextSize возвращает nil, если шрифт ещё не отрисован ни разу —
-        -- сначала рисуем текст вхолостую, потом меряем
-        surface.SetFont("TargetBB")
-        surface.SetTextColor(0, 0, 0, 0)
-        surface.SetTextPos(-100, -100)
-        surface.DrawText("ЗАРЯДКА")
-        surface.SetFont("TargetBB")
         local w = 200
         local h = 14
         local x = (ScrW() - w) / 2
@@ -144,12 +145,11 @@ if CLIENT then
         surface.DrawRect(x, y, w * frac, h)
 
         -- надпись
+        surface.SetFont("BlasterixHUD")
         surface.SetTextColor(255, 255, 255, 255)
         local label = charging and ("ЗАРЯДКА: " .. math.ceil(self:GetNextPrimaryFire() - CurTime()) .. "с")
             or "ГОТОВ К ВЫСТРЕЛУ"
         local tw, th = surface.GetTextSize(label)
-        tw = tw or 0
-        th = th or 0
         surface.SetTextPos(x + (w - tw) / 2, y + h + 6)
         surface.DrawText(label)
     end
