@@ -37,6 +37,11 @@ SWEP.ViewModel = "models/weapons/c_irifle.mdl"
 SWEP.WorldModel = "models/weapons/w_irifle.mdl"
 SWEP.UseHands = true
 
+-- Базовый CanPrimaryAttack молча блокирует выстрел при Ammo = "none" и ClipSize = -1
+function SWEP:CanPrimaryAttack()
+    return true
+end
+
 function SWEP:Initialize()
     self:SetHoldType("ar2")
 end
@@ -47,24 +52,49 @@ function SWEP:PrimaryAttack()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
 
+    local shootPos = owner:GetShootPos()
+    local aim = owner:GetAimVector()
+
     self:EmitSound("Weapon_AR2.Single")
 
     local bullet = {}
     bullet.Num = self.Primary.NumShots
-    bullet.Src = owner:GetShootPos()
-    bullet.Dir = owner:GetAimVector()
+    bullet.Src = shootPos
+    bullet.Dir = aim
     bullet.Spread = Vector(self.Primary.Spread, self.Primary.Spread, 0)
     bullet.Tracer = 1
     bullet.TracerName = "GaussTracer"
     bullet.Force = self.Primary.Force
     bullet.Damage = self.Primary.Damage
     bullet.AmmoType = self.Primary.Ammo
+
+    if SERVER then
+        -- Энергетический всплеск у дула (эффект энергошара AR2)
+        local muzzleFx = EffectData()
+        muzzleFx:SetOrigin(shootPos + aim * 40)
+        util.Effect("cball_explode", muzzleFx)
+
+        -- Электро-разряд вместо обычного выстрела
+        sound.Play("ambient/levels/labs/electric_explosion4.wav", shootPos, 100, 90, 1)
+
+        util.ScreenShake(shootPos, 8, 20, 0.5, 400)
+
+        bullet.Callback = function(att, tr, dmg)
+            if tr.Hit and not tr.HitSky then
+                local impactFx = EffectData()
+                impactFx:SetOrigin(tr.HitPos)
+                impactFx:SetNormal(tr.HitNormal)
+                util.Effect("cball_explode", impactFx)
+            end
+        end
+    end
+
     owner:FireBullets(bullet)
 
     self:ShootEffects()
 
     if owner.ViewPunch then
-        owner:ViewPunch(Angle(-self.Primary.Recoil, 0, 0))
+        owner:ViewPunch(Angle(-self.Primary.Recoil, math.Rand(-1, 1), 0))
     end
 
     self:SetNextPrimaryFire(CurTime() + self.Primary.Delay)
@@ -76,4 +106,51 @@ end
 
 function SWEP:SecondaryAttack()
     -- Нет вторичной атаки
+end
+
+if CLIENT then
+    local CHARGE_TIME = 5
+
+    -- Кастомный шрифт: TargetBB в GMod не существует, а для GetTextSize
+    -- нужен валидный шрифт. DejaVu Sans на месте и в Windows, и в Linux.
+    surface.CreateFont("BlasterixHUD", {
+        font = "DejaVu Sans",
+        size = 18,
+        weight = 600,
+    })
+
+    -- HUD-полоса: сколько осталось до следующего выстрела
+    function SWEP:DrawHUD()
+        local owner = self:GetOwner()
+        if not IsValid(owner) then return end
+
+        local frac = 1 - math.Clamp((self:GetNextPrimaryFire() - CurTime()) / CHARGE_TIME, 0, 1)
+        local charging = frac < 1
+
+        local w = 200
+        local h = 14
+        local x = (ScrW() - w) / 2
+        local y = ScrH() / 2 + 60
+
+        -- фон
+        surface.SetDrawColor(0, 0, 0, 150)
+        surface.DrawRect(x - 2, y - 2, w + 4, h + 4)
+
+        -- заполнение: синее заряжается, зелёное = готово
+        if charging then
+            surface.SetDrawColor(0, 130, 255, 220)
+        else
+            surface.SetDrawColor(0, 255, 100, 180)
+        end
+        surface.DrawRect(x, y, w * frac, h)
+
+        -- надпись
+        surface.SetFont("BlasterixHUD")
+        surface.SetTextColor(255, 255, 255, 255)
+        local label = charging and ("ЗАРЯДКА: " .. math.ceil(self:GetNextPrimaryFire() - CurTime()) .. "с")
+            or "ГОТОВ К ВЫСТРЕЛУ"
+        local tw, th = surface.GetTextSize(label)
+        surface.SetTextPos(x + (w - tw) / 2, y + h + 6)
+        surface.DrawText(label)
+    end
 end
